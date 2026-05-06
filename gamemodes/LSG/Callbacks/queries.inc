@@ -2623,6 +2623,7 @@ public SQL_Ismoketi2(playerid,Float:Kf,listitemid)
 			Alga-=procentas;
 			new forplayerid = GetIdForAlgos(Nameas);
 			pelnas[playerDB[playerid][plead]-1]-=Alga;
+			ResetFakeWorkerMins(playerDB[playerid][plead]);
 			//format(queryz,sizeof(queryz),"DELETE From Logs Where Veiksmas='Dirba' AND Zaidejas='%s'",Nameas);
 			//mysql_query(queryz);
 			if(forplayerid == INVALID_PLAYER_ID || playerDB[forplayerid][authstate]!=4)

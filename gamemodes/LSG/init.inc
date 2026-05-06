@@ -265,6 +265,16 @@ public OnGameModeInit()
 	SetTimer("JailGates",599984, 1); // 10min
 	SetTimer("GlobalUpdatez",239996, 1); // 4min
 	SetTimer("DegalaiZvejyba",9999,1); // 10 sec
+    // SOLO FEATURES
+    SetTimer("SimulatedEconomy",  120000, true);  // every 2 min
+    SetTimer("TerritoryUpdate",    60000, true);  // every 1 min
+    SetTimer("SupplyChainUpdate",  60000, true);  // every 1 min
+    SetTimer("FakeWorkerUpdate",   60000, true);  // every 1 min
+    SetTimer("FakePlayerUpdate",  180000, true);  // every 3 min
+    SetTimer("MortgagePayment",    60000, true);  // every 1 min
+    SetTimer("DailyMarketShift",  300000, true);  // every 5 min
+    InitSoloFeatures();
+
 
 	Shamal1 =AddStaticVehicle(469,1781.66369629,-1925.78820801,13.49185181,0.00000000,16,16); //Sparrow
 	Shamal2 =AddStaticVehicle(469,1798.97558594,-1925.74121094,13.49553299,0.00000000,16,16); //Sparrow
