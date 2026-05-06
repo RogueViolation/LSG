@@ -14110,7 +14110,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	}
 	if(dialogid == DIALOG_KAZINO_BET)
 	{
-		if(!response) { CMD:kazino(playerid,""); return 1; }
+		if(!response) { cmd_kazino(playerid,""); return 1; }
 		static const SlotBets[] = {100,500,1000,5000,10000};
 		new bet = SlotBets[listitem];
 		if(GetPlayerMoneyA(playerid) < bet)
@@ -14153,7 +14153,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	}
 	if(dialogid == DIALOG_DICE_BET)
 	{
-		if(!response) { CMD:kazino(playerid,""); return 1; }
+		if(!response) { cmd_kazino(playerid,""); return 1; }
 		static const DiceBets[] = {100,100,500,500,1000,1000};
 		new bet     = DiceBets[listitem];
 		new betHigh = ((listitem % 2) == 0);
