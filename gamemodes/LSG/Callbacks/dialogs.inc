@@ -14053,7 +14053,6 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 				OpenInWorldMenu(playerid);
 			}
 		}
-	}
 
 	// ============================================================
 	// SOLO FEATURES — DIALOG HANDLERS
@@ -14190,6 +14189,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 				"Mesti","Baigti");
 		return 1;
 	}
-	return 1;
+
+	}	return 1;
 }
 
