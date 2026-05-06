@@ -1509,6 +1509,10 @@ new TotalBanks;
 new BusinessInfo[MAX_BUSINESSES][BusinessSystem];
 //new BankuSystem[MAX_BUSINESSES][5];
 //new BankuWarnings[MAX_BUSINESSES][5];
+// --- Solo alive system ---
+new Float:g_MarketMultiplier = 1.0; // for dynamic prices
+new g_MarketDirection = 1; // 1 = growing, -1 = shrinking
+
 
 
 new Text3D:BankuTextai[MAX_BANKS][MAX_KASOS];
@@ -1545,6 +1549,10 @@ forward SkaiciuojamAtlygi();
 forward NaujasCP();
 forward NumerioPaieska(playerid,id);
 forward Atristi(playerid);
+forward BusinessPassiveIncome();
+forward WorldEvents();
+forward RadioChatter();
+forward DailyMarketShift();
 // ferverkai
 forward LoadFireWorkInfo();
 forward SaveFireWorkInfo();
@@ -3311,15 +3319,15 @@ public OnPlayerConnect(playerid)
 	PlayerTextDrawHide(playerid,JobText[playerid]);     
 	new version[40];
    	GetPlayerVersion(playerid, version, sizeof(version));
-	if(strcmp(version, SAMP_VERSION) != 0)
-	{
-		new stringaz[128];
-    	format(stringaz, sizeof(stringaz), "Demesio! Musu serveryje naudojama SAMP "#SAMP_VERSION" versija. Jusu versija: %s.", version);
-    	SendClientMessage(playerid, RED, stringaz);
-    	SendClientMessage(playerid, RED, "Prasome atsinaujinti savo klienta is www.sa-mp.com arba www.lsgyvenimas.lt");
-    	AC_Kick(playerid,"Wrong version",0,1);
-	}
-	//OnPlayerRequestClass(playerid, 20);
+	// if(strcmp(version, SAMP_VERSION) != 0)
+	// {
+	// 	new stringaz[128];
+    // 	format(stringaz, sizeof(stringaz), "Demesio! Musu serveryje naudojama SAMP "#SAMP_VERSION" versija. Jusu versija: %s.", version);
+    // 	SendClientMessage(playerid, RED, stringaz);
+    // 	SendClientMessage(playerid, RED, "Prasome atsinaujinti savo klienta is www.sa-mp.com arba www.lsgyvenimas.lt");
+    // 	AC_Kick(playerid,"Wrong version",0,1);
+	// }
+	// //OnPlayerRequestClass(playerid, 20);
 	return 1;
 }
 native gpci(playerid, serial[], maxlen);
@@ -18034,7 +18042,7 @@ public Zaidimas()
 		model,
 		tick=GetTickCount(),
 		State;
-	new hh=1;
+	new hh=2;
 	new hour,minute,second;
 	gettime(hour,minute,second);
 	if(hour == 19) hh=2;
@@ -18670,6 +18678,570 @@ public SecondTimer()
 	UpdateMap();
 	//VelykuEvent();
 	return 1;
+}
+
+public BusinessPassiveIncome()
+{
+    for(new i = 0; i < MAX_BUSINESSES; i++)
+    {
+        if(!BusinessInfo[i][bOwned]) continue;
+        if(!BusinessInfo[i][bNumber]) continue;
+
+        // --- Base income by business type ---
+        new baseIncome;
+        switch(BusinessInfo[i][bType])
+        {
+            case 7, 9:              baseIncome = MONEY_SIUKSLIAVEZIS;    // 23 - kioskas, xxx
+            case 2, 4, 12:          baseIncome = MONEY_PAKRANTES_APSAUGA;// 27 - 24-7, klubas, spurgos
+            case 3, 5, 10, 13:      baseIncome = MONEY_BANKININKAS;      // 42 - retail/food
+            case 1, 8, 11, 14:      baseIncome = MONEY_UKININKAS;        // 50 - service businesses
+            case 15, 16, 18, 20:    baseIncome = MONEY_SKELBEJAI;        // 100 - premium services
+            case 6, 17, 19:         baseIncome = MONEY_POLICININKAI;     // 128 - high value
+            case 21:                baseIncome = MONEY_INKASATORIUS;     // 176 - gas stations
+            default:                baseIncome = MONEY_BMX;              // 15 - empty/unknown
+        }
+
+        // --- Location bonus based on price ---
+        // Adds up to 50% of base for top-priced locations.
+        // Capped so a cheap bank still earns less than an expensive one,
+        // but type always dominates.
+        new priceBonus = (BusinessInfo[i][bPrice] / 100000) * (baseIncome / 6);
+        if(priceBonus > baseIncome / 2)
+            priceBonus = baseIncome / 2; // hard cap at +50%
+
+        // --- Random variation: +/- 25% of base ---
+        new total = baseIncome + priceBonus;
+        new income = total - (baseIncome / 4) + random(baseIncome / 2 + 1);
+		BusinessInfo[i][bEarning] += floatround(income * g_MarketMultiplier);
+    }
+    return 1;
+}
+
+// -------------------------------------------------------
+//  WORLD EVENTS
+//  Fires a random world event every 4-8 minutes.
+//  Uses a 1-second driver timer with a random countdown
+//  so events don't feel mechanical/predictable.
+// -------------------------------------------------------
+
+static g_NextEventIn = 0; // seconds until next event
+
+public WorldEvents()
+{
+    if(g_NextEventIn > 0)
+    {
+        g_NextEventIn--;
+        return 1;
+    }
+
+    // Schedule next event: somewhere between 4 and 8 minutes
+    g_NextEventIn = 240 + random(241);
+
+    // Pick a random event
+    switch(random(8))
+    {
+        case 0:
+        {
+            // Fire at a random owned business
+            new target = -1;
+            new attempts = 0;
+            while(target == -1 && attempts < 20)
+            {
+                new idx = random(MAX_BUSINESSES);
+                if(BusinessInfo[idx][bOwned] && BusinessInfo[idx][bNumber])
+                    target = idx;
+                attempts++;
+            }
+            if(target == -1) return 1;
+
+            new msg[128];
+            format(msg, sizeof(msg),
+                "* [GAISRINIAI] Praneðama apie gaisrà versle '%s'! Ugniagesiai iðvyko á ávykio vietà.",
+                BusinessInfo[target][bName]);
+            SendClientMessageToAll(0xFF4500FF, msg);
+
+            // Punish the business - lose some earnings
+            if(BusinessInfo[target][bEarning] > 0)
+                BusinessInfo[target][bEarning] = floatround(BusinessInfo[target][bEarning] * 0.7);
+        }
+        case 1:
+        {
+            // Car accident somewhere in the city
+            static const Float:AccidentSpots[5][3] = {
+                {1542.0, -1675.0, 13.5},   // near PD
+                {1173.0, -1323.0, 14.1},   // near hospital
+                {1798.0, -1894.0, 13.4},   // city hall area
+                {1654.0, -1098.0, 24.1},   // market area
+                {991.0,  -4.9,    2.7}     // taxi stand
+            };
+            new spot = random(5);
+            new msg[128];
+            format(msg, sizeof(msg),
+                "* [POLICIJA] Eismo ávykis uþfiksuotas koordinatëse %.0f, %.0f. Praðome vairuoti atsargiai.",
+                AccidentSpots[spot][0], AccidentSpots[spot][1]);
+            SendClientMessageToAll(0x87CEEBFF, msg);
+        }
+        case 2:
+        {
+            // Street fight reported
+            static const string:Areas[6][] = {
+                "Grovo gatvëje",
+                "prie Vinewood",
+                "East Los Santos rajone",
+                "prie jûros uosto",
+                "Commerce rajone",
+                "prie autobusø stoties"
+            };
+            new msg[128];
+            format(msg, sizeof(msg),
+                "* [POLICIJA] Praneðama apie muðtynës %s. Pareigûnai skuba á vietà.",
+                Areas[random(6)]);
+            SendClientMessageToAll(0xFF6347FF, msg);
+        }
+        case 3:
+        {
+            // Bank robbery rumour
+            SendClientMessageToAll(0xFF0000FF,
+                "* [POLICIJA] Gautas praneðimas apie ginkluotà apiplëðimà! Visi pareigûnai - budëkite!");
+        }
+        case 4:
+        {
+            // Drug bust
+            static const string:Locations[4][] = {
+                "Idlewood",
+                "Willowfield",
+                "East Beach",
+                "Jefferson"
+            };
+            new msg[128];
+            format(msg, sizeof(msg),
+                "* [POLICIJA] Narkotikø reidas %s rajone. Keletas sulaikytøjø.",
+                Locations[random(4)]);
+            SendClientMessageToAll(0xADFF2FFF, msg);
+        }
+        case 5:
+        {
+            // Robbery at a random owned business - steals earnings
+            new target = -1;
+            new attempts = 0;
+            while(target == -1 && attempts < 20)
+            {
+                new idx = random(MAX_BUSINESSES);
+                if(BusinessInfo[idx][bOwned] && BusinessInfo[idx][bNumber]
+                && BusinessInfo[idx][bEarning] > 500)
+                    target = idx;
+                attempts++;
+            }
+            if(target == -1) return 1;
+
+            new stolen = floatround(BusinessInfo[target][bEarning] * 0.3);
+            BusinessInfo[target][bEarning] -= stolen;
+
+            new msg[128];
+            format(msg, sizeof(msg),
+                "* [ÁSPËJIMAS] Verslas '%s' buvo apiplëðtas! Pavogta ~%i EUR.",
+                BusinessInfo[target][bName], stolen);
+            SendClientMessageToAll(0xFF0000FF, msg);
+        }
+        case 6:
+        {
+            // Peaceful event - market rush, bonus to a business
+            new target = -1;
+            new attempts = 0;
+            while(target == -1 && attempts < 20)
+            {
+                new idx = random(MAX_BUSINESSES);
+                if(BusinessInfo[idx][bOwned] && BusinessInfo[idx][bNumber])
+                    target = idx;
+                attempts++;
+            }
+            if(target == -1) return 1;
+
+            new bonus = 200 + random(301); // 200-500 bonus
+            BusinessInfo[target][bEarning] += bonus;
+
+            new msg[128];
+            format(msg, sizeof(msg),
+                "* Padidëjæs srautas versle '%s'! Papildomai uþdirbta ~%i EUR.",
+                BusinessInfo[target][bName], bonus);
+            SendClientMessageToAll(0x00FF7FFF, msg);
+        }
+        case 7:
+        {
+            // Weather/traffic report - pure flavour
+            static const string:WeatherMsgs[5][] = {
+                "* [RADIJAS] Spûstys Freeway gatvëje. Rekomenduojame rinktis kitas trases.",
+                "* [RADIJAS] Ðiandien numatomas giedras oras visame Los Santos regione.",
+                "* [RADIJAS] Futbolo rungtynës vakare - tikimasi padidëjusio eismo miesto centre.",
+                "* [RADIJAS] Komunaliniai darbai prie jûros uosto - galimi eismo sutrikimai.",
+                "* [RADIJAS] Naktinis Los Santos - miestas niekada nemiega."
+            };
+            SendClientMessageToAll(0xFFD700FF, WeatherMsgs[random(5)]);
+        }
+    }
+    return 1;
+}
+
+// -------------------------------------------------------
+//  RADIO CHATTER
+//  Sends periodic dispatcher-style messages.
+//  Fires every 2-5 minutes independently of world events
+//  so the radio feels continuously active.
+// -------------------------------------------------------
+
+static g_NextRadioIn = 0;
+
+public RadioChatter()
+{
+    if(g_NextRadioIn > 0)
+    {
+        g_NextRadioIn--;
+        return 1;
+    }
+
+    // Next chatter: 2 to 5 minutes
+    g_NextRadioIn = 120 + random(181);
+
+    // Outer switch picks job group, inner switch picks message.
+    // This keeps each group equally likely regardless of message count.
+    switch(random(16))
+    {
+        // --- Law enforcement ---
+        case 0:
+        {
+            switch(random(8))
+            {
+                case 0: SendMessageToTeisesauga(0xADD8E6FF,
+                    "[racija] Dispeèeris: Viskas ramu. Patruliuokite savo rajonus.");
+                case 1: SendMessageToTeisesauga(0xADD8E6FF,
+                    "[racija] Dispeèeris: 10-4. Vienetas prie Vinewood pereina á budëjimà.");
+                case 2: SendMessageToTeisesauga(0xADD8E6FF,
+                    "[racija] Dispeèeris: Gautas 10-11 prie Grove Street. Praðome patikrinti.");
+                case 3: SendMessageToTeisesauga(0xADD8E6FF,
+                    "[racija] Dispeèeris: 10-80 praneðtas Idlewood rajone. Budëkite.");
+                case 4: SendMessageToTeisesauga(0xADD8E6FF,
+                    "[racija] Dispeèeris: Visi vienetai - patikrinkite ryðá. Patvirtinkite pozicijas.");
+                case 5: SendMessageToTeisesauga(0xADD8E6FF,
+                    "[racija] Dispeèeris: 10-35 - nesankcionuotas transportas prie oro uosto.");
+                case 6: SendMessageToTeisesauga(0xADD8E6FF,
+                    "[racija] Vienetas-2: Sulaikytas asmuo veþamas á nuovadà. 10-15.");
+                case 7: SendMessageToTeisesauga(0xADD8E6FF,
+                    "[racija] Dispeèeris: Greièio paþeidimas uþfiksuotas Freeway. Kas netoliese - reaguokite.");
+            }
+        }
+        // --- Medics ---
+        case 1:
+        {
+            switch(random(6))
+            {
+                case 0: SendMessageToMedics(0xFF6347FF,
+                    "[racija] Dispeèeris: Medikai - budëkite, gali bûti iðkviestø.");
+                case 1: SendMessageToMedics(0xFF6347FF,
+                    "[racija] Dispeèeris: 10-52 gautas East LS rajone. Skubëkite.");
+                case 2: SendMessageToMedics(0xFF6347FF,
+                    "[racija] Medikai-1: Gráþtu á ligoninæ, pacientas pristatytas.");
+                case 3: SendMessageToMedics(0xFF6347FF,
+                    "[racija] Medikai-2: Atvykau á ávykio vietà. Situacija kontroliuojama.");
+                case 4: SendMessageToMedics(0xFF6347FF,
+                    "[racija] Dispeèeris: Kraujo atsargos atnaujintos. Visi preparatai paruoðti.");
+                case 5: SendMessageToMedics(0xFF6347FF,
+                    "[racija] Medikai-3: Pacientas stabilus, veþame á priëmimo skyriø.");
+            }
+        }
+        // --- Firefighters ---
+        case 2:
+        {
+            switch(random(6))
+            {
+                case 0: SendMessageToGaisras(0xFF4500FF,
+                    "[racija] Dispeèeris: Gaisrininkai - patikrinkite árangà. Budëjimas tæsiasi.");
+                case 1: SendMessageToGaisras(0xFF4500FF,
+                    "[racija] Dispeèeris: Dûmø praneðimas prie sandëliø rajono. Vienetas - tikrinkite.");
+                case 2: SendMessageToGaisras(0xFF4500FF,
+                    "[racija] Gaisrininkai-1: Gráþtu á dislokacijos vietà. 10-8.");
+                case 3: SendMessageToGaisras(0xFF4500FF,
+                    "[racija] Dispeèeris: Cheminis pavojus prie uosto. Apsaugos priemonës privalomos.");
+                case 4: SendMessageToGaisras(0xFF4500FF,
+                    "[racija] Gaisrininkai-2: Gaisras lokalizuotas. Situacija kontroliuojama.");
+                case 5: SendMessageToGaisras(0xFF4500FF,
+                    "[racija] Gaisrininkai-3: Vandens tiekimas stabilus. Pasiruoðæ kitam iðkvietimui.");
+            }
+        }
+        // --- Inkasatorius ---
+        case 3:
+        {
+            switch(random(5))
+            {
+                case 0: SendMessageToInka(0xFFD700FF,
+                    "[racija] Dispeèeris: Inkasatoriau, patvirtinkite marðruto statusà.");
+                case 1: SendMessageToInka(0xFFD700FF,
+                    "[racija] Inkasatorius-2: Marðrutas baigtas, gráþtu á saugyklà.");
+                case 2: SendMessageToInka(0xFFD700FF,
+                    "[racija] Inkasatorius-1: Pirmasis sustojimas atliktas. Judame toliau.");
+                case 3: SendMessageToInka(0xFFD700FF,
+                    "[racija] Dispeèeris: Saugykla paruoðta priimti siuntà. Judëkite pagal planà.");
+                case 4: SendMessageToInka(0xFFD700FF,
+                    "[racija] Dispeèeris: Dëmesio - sekite nustatytà marðrutà. Nukrypimai draudþiami.");
+            }
+        }
+        // --- Transport ---
+        case 4:
+        {
+            switch(random(6))
+            {
+                case 0: SendMessageToTransportas(0xADFF2FFF,
+                    "[racija] Dispeèeris: Transporto vienetas, patikrinkite krovinio statusà.");
+                case 1: SendMessageToTransportas(0xADFF2FFF,
+                    "[racija] Vairuotojas-3: Pristatymas atliktas. Gráþtu á bazæ.");
+                case 2: SendMessageToTransportas(0xADFF2FFF,
+                    "[racija] Dispeèeris: Naujas uþsakymas laukia. Kas laisvas - praneðkite.");
+                case 3: SendMessageToTransportas(0xADFF2FFF,
+                    "[racija] Vairuotojas-1: Krovimas baigtas, iðvaþiuoju á marðrutà.");
+                case 4: SendMessageToTransportas(0xADFF2FFF,
+                    "[racija] Dispeèeris: Eismas Freeway - vëlavimas galimas. Koreguokite marðrutà.");
+                case 5: SendMessageToTransportas(0xADFF2FFF,
+                    "[racija] Vairuotojas-2: Atvykau á pristatymo vietà. Laukiu iðkrovimo.");
+            }
+        }
+        // --- Furistai ---
+        case 5:
+        {
+            switch(random(5))
+            {
+                case 0: SendMessageToFuristai(0x87CEEBFF,
+                    "[racija] Dispeèeris: Furistai, naujas reisas paruoðtas. Laukiame patvirtinimo.");
+                case 1: SendMessageToFuristai(0x87CEEBFF,
+                    "[racija] Furistas-1: Krovimas baigtas, iðvaþiuoju.");
+                case 2: SendMessageToFuristai(0x87CEEBFF,
+                    "[racija] Furistas-2: Reisas vyksta pagal grafikà. Atvyksiu laiku.");
+                case 3: SendMessageToFuristai(0x87CEEBFF,
+                    "[racija] Dispeèeris: Naujas krovinys gautas. Kas laisvas priimti uþsakymà?");
+                case 4: SendMessageToFuristai(0x87CEEBFF,
+                    "[racija] Furistas-3: Pristatymas atliktas. Dokumentai pasiraðyti.");
+            }
+        }
+        // --- Automanai / Autospecai ---
+        case 6:
+        {
+            switch(random(6))
+            {
+                case 0: SendMessageToTune(0xFFA500FF,
+                    "[racija] Dispeèeris: Nauja maðina atvyksta servisui. Kas laisvas?");
+                case 1: SendMessageToTune(0xFFA500FF,
+                    "[racija] Mechanikas-2: Darbas atliktas, gráþtu á dirbtuves.");
+                case 2: SendMessageToAutospecai(0xFFA500FF,
+                    "[racija] Mechanikas-1: Automobilis paruoðtas. Savininkas informuotas.");
+                case 3: SendMessageToAutospecai(0xFFA500FF,
+                    "[racija] Dispeèeris: Daliø pristatymas gautas. Sandëlis atnaujintas.");
+                case 4: SendMessageToTune(0xFFA500FF,
+                    "[racija] Mechanikas-3: Diagnozë atlikta. Remontas uþtruks apie valandà.");
+                case 5: SendMessageToAutospecai(0xFFA500FF,
+                    "[racija] Dispeèeris: Klientø eilë - trys laukia. Paspartinkite darbà.");
+            }
+        }
+        // --- Bikers ---
+        case 7:
+        {
+            switch(random(5))
+            {
+                case 0: SendMessageToBaikeriai(0xFF69B4FF,
+                    "[racija] Dispeèeris: Baikeriai - naujas marðrutas gautas. Pasiruoðkite.");
+                case 1: SendMessageToBaikeriai(0xFF69B4FF,
+                    "[racija] Baiker-1: Pristatymas atliktas. 10-8.");
+                case 2: SendMessageToBaikeriai(0xFF69B4FF,
+                    "[racija] Baiker-2: Kelias laisvas. Judame pagal planà.");
+                case 3: SendMessageToBaikeriai(0xFF69B4FF,
+                    "[racija] Dispeèeris: Skubus pristatymas gautas. Kas arèiausiai - praneðkite.");
+                case 4: SendMessageToBaikeriai(0xFF69B4FF,
+                    "[racija] Baiker-3: Degalø papildymas. Gráþtu po penkiø minuèiø.");
+            }
+        }
+        // --- Government ---
+        case 8:
+        {
+            switch(random(5))
+            {
+                case 0: SendMessageToValstybe(0x9370DBFF,
+                    "[racija] Dispeèeris: Valstybës tarnautojai, posëdis po valandos.");
+                case 1: SendMessageToValstybe(0x9370DBFF,
+                    "[racija] Dispeèeris: Primename - visi protokolai turi bûti pildomi laiku.");
+                case 2: SendMessageToValstybe(0x9370DBFF,
+                    "[racija] Dispeèeris: Nauja direktyva gauta. Visi skyriaus vadovai - susirinkimas.");
+                case 3: SendMessageToValstybe(0x9370DBFF,
+                    "[racija] Valstybë-1: Dokumentø pateikimas atliktas. Laukiame patvirtinimo.");
+                case 4: SendMessageToValstybe(0x9370DBFF,
+                    "[racija] Dispeèeris: Biudþeto ataskaita turi bûti pateikta iki pabaigos.");
+            }
+        }
+        // --- NTA ---
+        case 9:
+        {
+            switch(random(5))
+            {
+                case 0: SendMessageToNTA(0xFF1493FF,
+                    "[racija] NTA Dispeèeris: Pirkëjas praðo árengti virtuvæ. Namas Nr. 420.");
+                case 1: SendMessageToNTA(0xFF1493FF,
+                    "[racija] NTA-1: Pasiraðëme pirkimo sutartá namui Nr. 555.");
+                case 2: SendMessageToNTA(0xFF1493FF,
+                    "[racija] NTA-2: Vakar girdëjau ðûvius Vinewood'e. Kainos gerokai nukris :D");
+                case 3: SendMessageToNTA(0xFF1493FF,
+                    "[racija] NTA Dispeèeris: Namas Nr. 69 praðo jûsø pagalbos dël ávertinimo.");
+                case 4: SendMessageToNTA(0xFF1493FF,
+                    "[racija] NTA-3: Vakar pardaviau Infernus'à su hydra uþ 190k :D");
+            }
+        }
+        // --- Clubs ---
+        case 10:
+        {
+            switch(random(6))
+            {
+                case 0: SendMessageToKlubai(0xDA70D6FF,
+                    "[racija] Klubo vadyba: Vakaro programa prasideda po dviejø valandø.");
+                case 1: SendMessageToKlubai(0xDA70D6FF,
+                    "[racija] Apsauga-1: Áëjimas tvarkingas, eilë kontroliuojama.");
+                case 2: SendMessageToKlubai(0xDA70D6FF,
+                    "[racija] Apsauga-2: VIP zona paruoðta. Sveèiai gali atvykti.");
+                case 3: SendMessageToKlubai(0xDA70D6FF,
+                    "[racija] Klubo vadyba: DJ keièiasi po valandos. Scena paruoðiama.");
+                case 4: SendMessageToKlubai(0xDA70D6FF,
+                    "[racija] Apsauga-3: Átartinas asmuo paðalintas ið teritorijos. Viskas ramu.");
+                case 5: SendMessageToKlubai(0xDA70D6FF,
+                    "[racija] Klubo vadyba: Baras papildytas. Alkoholio atsargos tvarkoj.");
+            }
+        }
+        // --- Security ---
+        case 11:
+        {
+            switch(random(5))
+            {
+                case 0: SendMessageToApsauga(0xC0C0C0FF,
+                    "[racija] Dispeèeris: Apsauga, patikrinkite perimetrà. Viskas ramu.");
+                case 1: SendMessageToApsauga(0xC0C0C0FF,
+                    "[racija] Apsauga-1: Vakarinis apëjimas atliktas. Vartai uþrakinti.");
+                case 2: SendMessageToApsauga(0xC0C0C0FF,
+                    "[racija] Apsauga-2: Stebëjimo kameros veikia normaliai. Situacija rami.");
+                case 3: SendMessageToApsauga(0xC0C0C0FF,
+                    "[racija] Dispeèeris: Átartinas automobilis prie pastato. Patikrinkite.");
+                case 4: SendMessageToApsauga(0xC0C0C0FF,
+                    "[racija] Apsauga-3: Incidentas iðspræstas. Gráþtu á postà.");
+            }
+        }
+        // --- Sunys (K9) ---
+        case 12:
+        {
+            switch(random(5))
+            {
+                case 0: SendMessageToSunys(0x6495EDFF,
+                    "[racija] Bosas: Matau atrakintà Sentinel prie ligoninës.");
+                case 1: SendMessageToSunys(0x6495EDFF,
+                    "[racija] Bosas: Petras sako, kad jo pirkëjas laiko Infernus raktelius uþ galinio rato.");
+                case 2: SendMessageToSunys(0x6495EDFF,
+                    "[racija] Bosas: Andrius jau antra diena neatraðo.");
+                case 3: SendMessageToSunys(0x6495EDFF,
+                    "[racija] Pirkëjas: Kada pristatysit mano ðvarø Journey??");
+                case 4: SendMessageToSunys(0x6495EDFF,
+                    "[racija] Bosas: Dar kartà pagaunu be maðinos - aplankysiu jûsø þmonas.");
+            }
+        }
+        // --- Kontrabanda ---
+        case 13:
+        {
+            switch(random(6))
+            {
+                case 0: SendMessageToKont(0x8B0000FF,
+                    "[racija] Kontaktas: Siunta kelyje. Bûkite pasiruoðæ.");
+                case 1: SendMessageToKont(0x8B0000FF,
+                    "[racija] Kontaktas: Nauja siunta atvyksta naktá. Susitikimas þinomoje vietoje.");
+                case 2: SendMessageToKont(0x8B0000FF,
+                    "[racija] Balsas: Sargybiniai pasikeitë. Galime judëti.");
+                case 3: SendMessageToKont(0x8B0000FF,
+                    "[racija] Kontaktas: Pirkëjas patvirtino. Sandoris vyks kaip planuota.");
+                case 4: SendMessageToKont(0x8B0000FF,
+                    "[racija] Balsas: Policija patruliuoja Idlewood. Palaukite signalo.");
+                case 5: SendMessageToKont(0x8B0000FF,
+                    "[racija] Kontaktas: Krovinys saugus. Pristatymas rytoj auðtant.");
+            }
+        }
+        // --- Dealer ---
+        case 14:
+        {
+            switch(random(6))
+            {
+                case 0: SendMessageToDeal(0x8B0000FF,
+                    "[racija] Kontaktas: Klientas laukia. Nevëluokite.");
+                case 1: SendMessageToDeal(0x8B0000FF,
+                    "[racija] Balsas: Medþiaga gauta. Paskirstymas prasideda.");
+                case 2: SendMessageToDeal(0x8B0000FF,
+                    "[racija] Kontaktas: Naujas klientas siunèiamas jûsø pusën. Bûkite atsargûs.");
+                case 3: SendMessageToDeal(0x8B0000FF,
+                    "[racija] Balsas: Policija netoliese. Ðiandien nedirbu.");
+                case 4: SendMessageToDeal(0x8B0000FF,
+                    "[racija] Kontaktas: Mokëjimas gautas. Galite pristatyti.");
+                case 5: SendMessageToDeal(0x8B0000FF,
+                    "[racija] Balsas: Pasitikimas perkelta á rytojø. Saugokitës.");
+            }
+        }
+        // --- Crew ---
+        case 15:
+        {
+            // SendMessageToCrew needs a crewid - skip if no crews are active,
+            // or repurpose this slot as a second law enforcement roll
+            switch(random(5))
+            {
+                case 0: SendMessageToTeisesauga(0xADD8E6FF,
+                    "[racija] ARAS-1: Pozicija uþimta. Laukiame ásakymo.");
+                case 1: SendMessageToTeisesauga(0xADD8E6FF,
+                    "[racija] Dispeèeris: KOBRA vienetas - pasiruoðimas patvirtintas.");
+                case 2: SendMessageToNTA(0xFF1493FF,
+                    "[racija] NTA Dispeèeris: Keièiasi pamaina. Perdavimas 22:00.");
+                case 3: SendMessageToGaisras(0xFF4500FF,
+                    "[racija] Dispeèeris: Mënesinis árangos patikrinimas rytoj 8:00. Visi privalomi.");
+                case 4: SendMessageToMedics(0xFF6347FF,
+                    "[racija] Dispeèeris: Ligoninë praneða apie laisvà lovà. Galima priimti pacientus.");
+            }
+        }
+    }
+    return 1;
+}
+
+// -------------------------------------------------------
+//  DAILY MARKET SHIFT
+//  Fires every in-game hour. Drifts g_MarketMultiplier
+//  between 0.7 and 1.4, so passive income and the robbery
+//  bonus both feel like they respond to a living economy.
+//  The multiplier is applied inside BusinessPassiveIncome.
+// -------------------------------------------------------
+
+public DailyMarketShift()
+{
+    // Drift the multiplier in the current direction
+    g_MarketMultiplier += g_MarketDirection * (0.02 + random(4) * 0.01); // 0.02-0.05 per hour
+
+    // Bounce off the floor/ceiling
+    if(g_MarketMultiplier >= 1.4)
+    {
+        g_MarketMultiplier = 1.4;
+        g_MarketDirection = -1;
+        SendClientMessageToAll(0xFFD700FF,
+            "* [EKONOMIKA] Rinkos aktyvumas smunka. Verslo pajamos maþës.");
+    }
+    else if(g_MarketMultiplier <= 0.7)
+    {
+        g_MarketMultiplier = 0.7;
+        g_MarketDirection = 1;
+        SendClientMessageToAll(0xFFD700FF,
+            "* [EKONOMIKA] Rinka atsigauna. Verslo pajamos augs.");
+    }
+    else if(random(5) == 0) // occasional news bulletin at other times
+    {
+        new msg[128];
+        format(msg, sizeof(msg),
+            "* [EKONOMIKA] Rinkos indeksas: %.0f%%. %s",
+            g_MarketMultiplier * 100.0,
+            (g_MarketDirection == 1) ? "Tendencija auganti." : "Tendencija krentanti.");
+        SendClientMessageToAll(0xFFD700FF, msg);
+    }
+    return 1;
 }
 
 ///////////////////////////
@@ -19817,7 +20389,7 @@ new garazostatus = 0; // closed
 
 public rentfee()
 {
-	InkaUzsakymas();
+	//InkaUzsakymas();
 	//KaleduEvent();
 	//NarkoPildymas();
 	new pname[24];
