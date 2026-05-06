@@ -14101,9 +14101,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 		else
 			ShowPlayerDialog(playerid, DIALOG_DICE_BET, DIALOG_STYLE_LIST,
 				"Kauliukai - Pasirinkite",
-				"100 EUR - Didelis (7-12)\n100 EUR - Mazas (2-6)\n"
-				"500 EUR - Didelis (7-12)\n500 EUR - Mazas (2-6)\n"
-				"1000 EUR - Didelis (7-12)\n1000 EUR - Mazas (2-6)",
+				"100 EUR - Didelis (7-12)\n100 EUR - Mazas (2-6)\n500 EUR - Didelis (7-12)\n500 EUR - Mazas (2-6)\n1000 EUR - Didelis (7-12)\n1000 EUR - Mazas (2-6)",
 				"Mesti","Atgal");
 		return 1;
 	}
@@ -14183,9 +14181,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 		if(response)
 			ShowPlayerDialog(playerid, DIALOG_DICE_BET, DIALOG_STYLE_LIST,
 				"Kauliukai - Pasirinkite",
-				"100 EUR - Didelis (7-12)\n100 EUR - Mazas (2-6)\n"
-				"500 EUR - Didelis (7-12)\n500 EUR - Mazas (2-6)\n"
-				"1000 EUR - Didelis (7-12)\n1000 EUR - Mazas (2-6)",
+				"100 EUR - Didelis (7-12)\n100 EUR - Mazas (2-6)\n500 EUR - Didelis (7-12)\n500 EUR - Mazas (2-6)\n1000 EUR - Didelis (7-12)\n1000 EUR - Mazas (2-6)",
 				"Mesti","Baigti");
 		return 1;
 	}
