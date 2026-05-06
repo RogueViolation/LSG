@@ -39074,7 +39074,7 @@ CMD:paskola(playerid, params[])
     new bizid = -1;
     foreach(Businesses, i)
     {
-        if(IsPlayerInRangeOfPointEx(2.0, playerid,
+        if(IsPlayerInRangeOfPoint(playerid, 2.0,
             BusinessInfo[i][bEnterX], BusinessInfo[i][bEnterY], BusinessInfo[i][bEnterZ]))
         { bizid = i; break; }
     }
@@ -39123,16 +39123,16 @@ CMD:paskolainfo(playerid, params[])
     return 1;
 }
 
-stock GetCompanyIdx(plead)
+stock GetCompanyIdx(leadId)
 {
     for(new c = 0; c < MAX_TRACKED_COMPANIES; c++)
-        if(g_CompanyPlead[c] == plead) return c;
+        if(g_CompanyPlead[c] == leadId) return c;
     return -1;
 }
 
-stock ResetFakeWorkerMins(plead)
+stock ResetFakeWorkerMins(leadId)
 {
-    new cidx = GetCompanyIdx(plead);
+    new cidx = GetCompanyIdx(leadId);
     if(cidx == -1) return;
     for(new w = 0; w < MAX_FAKE_WORKERS_PER_CO; w++)
         if(g_FakeWorkerActive[cidx][w])
