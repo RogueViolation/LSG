@@ -20389,7 +20389,7 @@ new garazostatus = 0; // closed
 
 public rentfee()
 {
-	InkaUzsakymas();
+	//InkaUzsakymas();
 	//KaleduEvent();
 	//NarkoPildymas();
 	new pname[24];
