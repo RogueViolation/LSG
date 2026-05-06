@@ -1507,6 +1507,97 @@ new BankID[MAX_BANKS];
 new TotalBanks;
 
 new BusinessInfo[MAX_BUSINESSES][BusinessSystem];
+// ============================================================
+// SOLO FEATURES — GLOBALS
+// ============================================================
+
+// Feature 2: Gang Territories
+#define MAX_SOLO_ZONES 12
+new ZoneInfluence[MAX_SOLO_ZONES][MAX_FAMILY];
+new ZoneController[MAX_SOLO_ZONES] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+new g_ZoneNames[MAX_SOLO_ZONES][24] = {
+    "Idlewood","Willowfield","Ganton","Davis",
+    "East Beach","Jefferson","Playa del Seville",
+    "Temple","Pershing Square","Marina",
+    "Vinewood","Commerce"
+};
+new Float:g_ZoneCenters[MAX_SOLO_ZONES][3] = {
+    {2017.0,-1705.0,13.0},{2141.0,-1471.0,23.0},
+    {2495.0,-1692.0,13.0},{2032.0,-1897.0,13.0},
+    {2650.0,-1578.0,13.0},{2155.0,-1526.0,23.0},
+    {2736.0,-1769.0,13.0},{1291.0,-1091.0,23.0},
+    {1571.0,-1352.0,23.0},{818.0, -1367.0,23.0},
+    {676.0, -1031.0,23.0},{1708.0,-1534.0,23.0}
+};
+new Float:g_ZoneRadius[MAX_SOLO_ZONES] = {
+    200.0,180.0,200.0,180.0,160.0,150.0,
+    160.0,150.0,150.0,160.0,150.0,150.0
+};
+
+// Feature 3: Criminal Supply Chain
+new g_KontrabandaStock  = 0;
+new g_DealerStock       = 0;
+new g_KontrabandaPrice  = 800;
+new g_DealerPrice       = 500;
+
+// Feature 4: Mortgage
+new g_MortgageRemaining[MAX_BUSINESSES];
+new bool:g_HasMortgage[MAX_BUSINESSES];
+
+// Feature 5: Fake Workers
+#define FAKE_NAME_POOL          24
+#define MAX_FAKE_WORKERS_PER_CO  6
+#define MAX_TRACKED_COMPANIES   13
+new g_FakeNamePool[FAKE_NAME_POOL][24] = {
+    "Tomas_Kazlauskas","Mantas_Petraitis","Lukas_Jonauskas",
+    "Rytis_Jankauskas","Darius_Stankaitis","Rokas_Valentinas",
+    "Arnas_Grigas","Edvinas_Zukas","Karolis_Paulikas",
+    "Mindaugas_Navickas","Justinas_Rimkus","Donatas_Bernotas",
+    "Saulius_Tamasonis","Rimas_Zukauskas","Andrius_Mazeika",
+    "Vilius_Brazas","Erikas_Laurinas","Domantas_Sileika",
+    "Povilas_Radziunas","Tautvydas_Petrys","Gintaras_Kazys",
+    "Aidas_Stonkus","Benas_Jurkus","Zygimantas_Valius"
+};
+new g_CompanyPlead[MAX_TRACKED_COMPANIES] = {
+    2,3,5,6,34,50,58,60,70,80,90,98,66
+};
+new g_FakeWorkerName[MAX_TRACKED_COMPANIES][MAX_FAKE_WORKERS_PER_CO][24];
+new g_FakeWorkerMins[MAX_TRACKED_COMPANIES][MAX_FAKE_WORKERS_PER_CO];
+new bool:g_FakeWorkerActive[MAX_TRACKED_COMPANIES][MAX_FAKE_WORKERS_PER_CO];
+
+// Feature 6: Crime Response Checkpoints
+new g_CrimeCP          = -1;
+new g_CrimeReward      =  0;
+new g_CrimeCPTimer     = -1;
+new g_CrimeCPType      =  0; // 0=police 1=fire 2=medic 3=anyone
+new bool:g_CrimeCPActive = false;
+
+// Feature 7: Fake Player Display
+#define MAX_FAKE_PLAYERS_DISPLAY 20
+new g_FakeDisplayName[MAX_FAKE_PLAYERS_DISPLAY][24];
+new g_FakeDisplayScore[MAX_FAKE_PLAYERS_DISPLAY];
+new bool:g_FakeDisplayOnline[MAX_FAKE_PLAYERS_DISPLAY];
+
+// Feature 8: Gambling dialog IDs
+#define DIALOG_KAZINO_MAIN   9100
+#define DIALOG_KAZINO_BET    9101
+#define DIALOG_KAZINO_RESULT 9102
+#define DIALOG_DICE_BET      9103
+#define DIALOG_DICE_RESULT   9104
+#define DIALOG_MORTGAGE      9105
+#define DIALOG_TERRITORY     9106
+#define DIALOG_WAREHOUSE     9107
+#define DIALOG_COWORKERS     9108
+#define DIALOG_FAKE_PLAYERS  9109
+#define DIALOG_MORTGAGE_INFO 9110
+
+// Slot machine symbols/colors
+new g_SlotSymbols[7][8] = {"[7]","[BAR]","[BELL]","[CHE]","[ORA]","[LEM]","[GRA]"};
+new g_SlotColors[7][12] = {
+    "{FF0000}","{FFFF00}","{FFA500}",
+    "{FF6666}","{FF8800}","{FFFF88}","{CC66FF}"
+};
+
 //new BankuSystem[MAX_BUSINESSES][5];
 //new BankuWarnings[MAX_BUSINESSES][5];
 // --- Solo alive system ---
@@ -1663,6 +1754,14 @@ forward GlobalUpdatez();
 
 forward UnjailPlayer(playerid,Float:x,Float:y,Float:z,Float:a,interior);
 forward DrugEffectGone(playerid);
+forward SimulatedEconomy();
+forward TerritoryUpdate();
+forward SupplyChainUpdate();
+forward FakeWorkerUpdate();
+forward FakePlayerUpdate();
+forward MortgagePayment();
+forward CrimeResponseExpired();
+
 /*
 forward Iskrovimas(playerid,vehicleid,number);
 forward Pakrovimas(playerid,vehicleid,number);
@@ -38694,6 +38793,468 @@ public FixBot()
 		PutPlayerInVehicle(bot,Busikas,0);
 	}
 }
+
+// ============================================================
+// SOLO FEATURES — FUNCTIONS
+// ============================================================
+
+stock InitSoloFeatures()
+{
+    for(new c = 0; c < MAX_TRACKED_COMPANIES; c++)
+    {
+        new workers = 3 + random(4);
+        new pool[FAKE_NAME_POOL];
+        for(new p = 0; p < FAKE_NAME_POOL; p++) pool[p] = p;
+        for(new p = FAKE_NAME_POOL-1; p > 0; p--)
+        {
+            new j = random(p+1), tmp = pool[p];
+            pool[p] = pool[j]; pool[j] = tmp;
+        }
+        for(new w = 0; w < MAX_FAKE_WORKERS_PER_CO; w++)
+        {
+            if(w < workers)
+            {
+                format(g_FakeWorkerName[c][w], 24, "%s", g_FakeNamePool[pool[w]]);
+                g_FakeWorkerMins[c][w]   = 50 + random(300);
+                g_FakeWorkerActive[c][w] = true;
+            }
+            else g_FakeWorkerActive[c][w] = false;
+        }
+    }
+    for(new i = 0; i < MAX_FAKE_PLAYERS_DISPLAY; i++)
+    {
+        format(g_FakeDisplayName[i], 24, "%s", g_FakeNamePool[random(FAKE_NAME_POOL)]);
+        g_FakeDisplayScore[i]  = 500 + random(60000);
+        g_FakeDisplayOnline[i] = (random(3) != 0);
+    }
+    return 1;
+}
+
+
+public SimulatedEconomy()
+{
+    new visits = 3 + random(6);
+    for(new v = 0; v < visits; v++)
+    {
+        new idx = Iter_Random(Businesses);
+        if(idx == -1 || !BusinessInfo[idx][bOwned]) continue;
+        new amount;
+        switch(BusinessInfo[idx][bType])
+        {
+            case 7,9:           amount = 15 + random(60);
+            case 2,4,12:        amount = 30 + random(80);
+            case 3,5,10,13:     amount = 50 + random(120);
+            case 1,8,11,14:     amount = 70 + random(180);
+            case 15,16,18,20:   amount = 100 + random(250);
+            case 6,17,19:       amount = 120 + random(300);
+            case 21:            amount = 200 + random(500);
+            default:            amount = 20 + random(50);
+        }
+        BusinessInfo[idx][bEarning] += floatround(amount * g_MarketMultiplier);
+    }
+    for(new c = 0; c < MAX_TRACKED_COMPANIES; c++)
+    {
+        new pIdx = g_CompanyPlead[c] - 1;
+        if(pIdx < 0 || pIdx >= 100) continue;
+        new drip = floatround((20 + random(60)) * g_MarketMultiplier);
+        pelnas[pIdx] += drip;
+    }
+    return 1;
+}
+
+public TerritoryUpdate()
+{
+    foreach(Player, i)
+    {
+        if(playerDB[i][pgang] < 0 || playerDB[i][pgang] >= MAX_FAMILY) continue;
+        if(GetPlayerVirtualWorld(i) != 0) continue;
+        for(new z = 0; z < MAX_SOLO_ZONES; z++)
+        {
+            if(IsPlayerInRangeOfPoint(i, g_ZoneRadius[z],
+                g_ZoneCenters[z][0], g_ZoneCenters[z][1], g_ZoneCenters[z][2]))
+            {
+                ZoneInfluence[z][playerDB[i][pgang]] += 2;
+                if(ZoneInfluence[z][playerDB[i][pgang]] > 1000)
+                    ZoneInfluence[z][playerDB[i][pgang]] = 1000;
+                break;
+            }
+        }
+    }
+    for(new z = 0; z < MAX_SOLO_ZONES; z++)
+        for(new g = 0; g < MAX_FAMILY; g++)
+            if(ZoneInfluence[z][g] > 0)
+                ZoneInfluence[z][g] = floatround(ZoneInfluence[z][g] * 0.995);
+    for(new z = 0; z < MAX_SOLO_ZONES; z++)
+    {
+        if(ZoneController[z] == -1 && random(20) == 0)
+        {
+            new g = random(MAX_FAMILY);
+            ZoneInfluence[z][g] += 10;
+        }
+    }
+    for(new z = 0; z < MAX_SOLO_ZONES; z++)
+    {
+        new topGang = -1, topInfluence = 80;
+        for(new g = 0; g < MAX_FAMILY; g++)
+        {
+            if(ZoneInfluence[z][g] > topInfluence)
+            {
+                topInfluence = ZoneInfluence[z][g];
+                topGang = g;
+            }
+        }
+        if(topGang != ZoneController[z])
+        {
+            new msg[128];
+            if(topGang != -1)
+                format(msg,sizeof(msg),
+                    "* [TERITORIJA] Gauja \"%s\" perëmë %s rajonà!",
+                    FamilyInfo[topGang][FamilyName], g_ZoneNames[z]);
+            else
+                format(msg,sizeof(msg),
+                    "* [TERITORIJA] Rajonas %s tapo neutralus.", g_ZoneNames[z]);
+            SendClientMessageToAll(0xFF6600FF, msg);
+            ZoneController[z] = topGang;
+        }
+    }
+    return 1;
+}
+
+stock ProcessTerritoryKill(killerid)
+{
+    if(!IsPlayerConnected(killerid)) return;
+    if(playerDB[killerid][pgang] < 0) return;
+    if(GetPlayerVirtualWorld(killerid) != 0) return;
+    for(new z = 0; z < MAX_SOLO_ZONES; z++)
+    {
+        if(IsPlayerInRangeOfPoint(killerid, g_ZoneRadius[z],
+            g_ZoneCenters[z][0], g_ZoneCenters[z][1], g_ZoneCenters[z][2]))
+        {
+            ZoneInfluence[z][playerDB[killerid][pgang]] += 15;
+            if(ZoneInfluence[z][playerDB[killerid][pgang]] > 1000)
+                ZoneInfluence[z][playerDB[killerid][pgang]] = 1000;
+            return;
+        }
+    }
+}
+
+CMD:teritorijos(playerid, params[])
+{
+    #pragma unused params
+    new msg[1536];
+    format(msg, sizeof(msg), "{FFFFFF}Gauj\xf8 teritorij\xf8 kontrol\xeb:\n\n");
+    for(new z = 0; z < MAX_SOLO_ZONES; z++)
+    {
+        new ctrl = ZoneController[z];
+        new myGang = playerDB[playerid][pgang];
+        new myInfluence = (myGang >= 0) ? ZoneInfluence[z][myGang] : 0;
+        if(ctrl == -1)
+            format(msg,sizeof(msg),"%s{AAAAAA}%-22s Neutrali         J\xfbs\xf8 \xeet\xf3ka: %d\n",
+                msg, g_ZoneNames[z], myInfluence);
+        else
+            format(msg,sizeof(msg),"%s{FFFFFF}%-22s {FF6600}%-18s{FFFFFF} J\xfbs\xf8 \xeet\xf3ka: %d\n",
+                msg, g_ZoneNames[z], FamilyInfo[ctrl][FamilyName], myInfluence);
+    }
+    ShowPlayerDialog(playerid, DIALOG_TERRITORY, DIALOG_STYLE_MSGBOX, "Teritorijos", msg, "Gerai", "");
+    return 1;
+}
+
+public SupplyChainUpdate()
+{
+    if(g_KontrabandaStock < 100) g_KontrabandaStock += 2;
+    if(g_DealerStock < 60) g_DealerStock += 3;
+    g_KontrabandaPrice = floatround(800.0 * g_MarketMultiplier) + random(200) - 100;
+    g_DealerPrice      = floatround(500.0 * g_MarketMultiplier) + random(150) - 75;
+    if(g_KontrabandaPrice < 400) g_KontrabandaPrice = 400;
+    if(g_DealerPrice < 250)      g_DealerPrice = 250;
+    return 1;
+}
+
+CMD:sandelis(playerid, params[])
+{
+    #pragma unused params
+    new job = playerDB[playerid][specialybe];
+    new msg[256];
+    if(job == 31)
+    {
+        format(msg,sizeof(msg),
+            "Kontrabandos sand\xeb lis\n\nAtsargos: {00FF00}%d vnt.{FFFFFF}\nKaina rinkoje: {FFFF00}%d EUR/vnt.{FFFFFF}\n\nGalite parduoti iki 20 vnt. i\xf0 karto.\nNaudokite: /pnark [kiekis]",
+            g_KontrabandaStock, g_KontrabandaPrice);
+        ShowPlayerDialog(playerid, DIALOG_WAREHOUSE, DIALOG_STYLE_MSGBOX, "Sand\xeblis", msg, "Gerai", "");
+    }
+    else if(job == 32)
+    {
+        format(msg,sizeof(msg),
+            "Dilerio sand\xeblis\n\nAtsargos: {00FF00}%d vnt.{FFFFFF}\nKaina rinkoje: {FFFF00}%d EUR/vnt.{FFFFFF}\n\nGalite parduoti iki 15 vnt. i\xf0 karto.\nNaudokite: /pnark [kiekis]",
+            g_DealerStock, g_DealerPrice);
+        ShowPlayerDialog(playerid, DIALOG_WAREHOUSE, DIALOG_STYLE_MSGBOX, "Sand\xeblis", msg, "Gerai", "");
+    }
+    else return SendInfoMessage(playerid, "\xd0i komanda tik kontrabandistams ir dileriams.");
+    return 1;
+}
+
+CMD:pnark(playerid, params[])
+{
+    new job = playerDB[playerid][specialybe];
+    new kiek;
+    if(job == 31)
+    {
+        if(!g_KontrabandaStock)
+            return SendInfoMessage(playerid, "\xd0iuo metu n\xeb ra preki\xf8. Atsargos kaupasi automatiðkai.");
+        if(sscanf(params,"i",kiek) || kiek <= 0) kiek = g_KontrabandaStock;
+        if(kiek > g_KontrabandaStock) kiek = g_KontrabandaStock;
+        if(kiek > 20) kiek = 20;
+        new earned = kiek * g_KontrabandaPrice;
+        g_KontrabandaStock -= kiek;
+        GivePlayerMoneyA(playerid, earned);
+        Pelnas(playerid, 89, earned / 4);
+        new msg[128];
+        format(msg,sizeof(msg)," * Pardav\xeb te %d vnt. kontrabandos. Gavote %d EUR (%d/vnt.).",
+            kiek, earned, g_KontrabandaPrice);
+        SendClientMessage(playerid, 0xCC0000FF, msg);
+        MLog(playerid,"Parduota kontrabanda","ii",kiek,earned);
+    }
+    else if(job == 32)
+    {
+        if(!g_DealerStock)
+            return SendInfoMessage(playerid, "\xd0iuo metu n\xeb ra preki\xf8. Atsargos kaupasi automatiðkai.");
+        if(sscanf(params,"i",kiek) || kiek <= 0) kiek = g_DealerStock;
+        if(kiek > g_DealerStock) kiek = g_DealerStock;
+        if(kiek > 15) kiek = 15;
+        new earned = kiek * g_DealerPrice;
+        g_DealerStock -= kiek;
+        GivePlayerMoneyA(playerid, earned);
+        Pelnas(playerid, 89, earned / 4);
+        new msg[128];
+        format(msg,sizeof(msg)," * Pardav\xeb te %d vnt. preki\xf8. Gavote %d EUR (%d/vnt.).",
+            kiek, earned, g_DealerPrice);
+        SendClientMessage(playerid, 0xCC0000FF, msg);
+    }
+    else return SendInfoMessage(playerid, "\xd0i komanda tik kontrabandistams ir dileriams.");
+    return 1;
+}
+
+public MortgagePayment()
+{
+    for(new i = 0; i < MAX_BUSINESSES; i++)
+    {
+        if(!g_HasMortgage[i] || !BusinessInfo[i][bOwned]) continue;
+        if(BusinessInfo[i][bEarning] <= 100) continue;
+        new payment = 150 + random(100);
+        if(payment > BusinessInfo[i][bEarning] - 100)
+            payment = BusinessInfo[i][bEarning] - 100;
+        if(payment > g_MortgageRemaining[i])
+            payment = g_MortgageRemaining[i];
+        BusinessInfo[i][bEarning]    -= payment;
+        g_MortgageRemaining[i]       -= payment;
+        if(g_MortgageRemaining[i] <= 0)
+        {
+            g_HasMortgage[i]       = false;
+            g_MortgageRemaining[i] = 0;
+            foreach(Player, pid)
+            {
+                if(strcmp(ReturnName(pid), BusinessInfo[i][bOwner], false) == 0)
+                {
+                    new msg[128];
+                    format(msg,sizeof(msg)," * Verslo paskola visiðkai gr\xe0\x17\x07inta! Verslas dabar j\xfbs\xf8.",
+                        BusinessInfo[i][bName]);
+                    SendClientMessage(pid, 0x00FF00FF, msg);
+                    break;
+                }
+            }
+        }
+    }
+    return 1;
+}
+
+CMD:paskola(playerid, params[])
+{
+    #pragma unused params
+    if(!IsInBiz(playerid)) return SendInfoMessage(playerid,"Jus nesate prie verslo!");
+    new bizid = -1;
+    foreach(Businesses, i)
+    {
+        if(IsPlayerInRangeOfPointEx(2.0, playerid,
+            BusinessInfo[i][bEnterX], BusinessInfo[i][bEnterY], BusinessInfo[i][bEnterZ]))
+        { bizid = i; break; }
+    }
+    if(bizid == -1)  return SendInfoMessage(playerid,"Nesate prie jokio verslo!");
+    if(BusinessInfo[bizid][bOwned]) return SendInfoMessage(playerid,"Sis verslas jau turi savininkà!");
+    if(GetPlayerScore(playerid) < 2000) return SendInfoMessage(playerid,"Paskolai reikia bent 2000 XP!");
+    if(g_HasMortgage[bizid]) return SendInfoMessage(playerid,"Siam verslui jau yra aktyvi paskola!");
+    new price       = BusinessInfo[bizid][bPrice];
+    new downPayment = price / 5;
+    new mortgage    = price - downPayment;
+    new perMin      = 200;
+    if(GetPlayerMoneyA(playerid) < downPayment)
+    {
+        new msg[128];
+        format(msg,sizeof(msg),"Pradinë ámoka: {FF0000}%d EUR{FFFFFF} (20%%). Jums trûksta pinigø.",downPayment);
+        return SendInfoMessage(playerid,msg);
+    }
+    new msg[512];
+    format(msg,sizeof(msg),
+        "Verslas: {FFFF00}%s{FFFFFF}\nTipas: %s\n\nKaina: %d EUR\nPradinë ámoka (20%%): {FF0000}%d EUR{FFFFFF}\nPaskola: {FFFF00}%d EUR{FFFFFF}\n\nGràþinama automatiðkai ið verslo pelno.\nApytiksliai ~%d EUR per minutæ.\n\nAr norite imti paskolà?",
+        BusinessInfo[bizid][bName], GetBussinessType(BusinessInfo[bizid][bType]),
+        price, downPayment, mortgage, perMin);
+    SetPVarInt(playerid,"MortgageBizID",bizid);
+    ShowPlayerDialog(playerid, DIALOG_MORTGAGE, DIALOG_STYLE_MSGBOX,"Verslo paskola",msg,"Imti paskolà","Atðaukti");
+    return 1;
+}
+
+CMD:paskolainfo(playerid, params[])
+{
+    #pragma unused params
+    new pname[MAX_PLAYER_NAME];
+    GetPlayerName(playerid,pname,sizeof(pname));
+    new msg[512], found = 0;
+    format(msg,sizeof(msg),"{FFFFFF}Jusu aktyvios paskolos:\n\n");
+    foreach(Businesses,i)
+    {
+        if(g_HasMortgage[i] && strcmp(BusinessInfo[i][bOwner],pname,false)==0)
+        {
+            format(msg,sizeof(msg),"%s{FFFF00}%s{FFFFFF}: Liko graZinti {FF0000}%d EUR{FFFFFF}\n",
+                msg, BusinessInfo[i][bName], g_MortgageRemaining[i]);
+            found++;
+        }
+    }
+    if(!found) return SendInfoMessage(playerid,"Jus neturite aktyviu paskolu.");
+    ShowPlayerDialog(playerid, DIALOG_MORTGAGE_INFO, DIALOG_STYLE_MSGBOX,"Paskolos",msg,"Gerai","");
+    return 1;
+}
+
+stock GetCompanyIdx(plead)
+{
+    for(new c = 0; c < MAX_TRACKED_COMPANIES; c++)
+        if(g_CompanyPlead[c] == plead) return c;
+    return -1;
+}
+
+stock ResetFakeWorkerMins(plead)
+{
+    new cidx = GetCompanyIdx(plead);
+    if(cidx == -1) return;
+    for(new w = 0; w < MAX_FAKE_WORKERS_PER_CO; w++)
+        if(g_FakeWorkerActive[cidx][w])
+            g_FakeWorkerMins[cidx][w] = 0;
+}
+
+public FakeWorkerUpdate()
+{
+    for(new c = 0; c < MAX_TRACKED_COMPANIES; c++)
+    {
+        for(new w = 0; w < MAX_FAKE_WORKERS_PER_CO; w++)
+        {
+            if(!g_FakeWorkerActive[c][w]) continue;
+            if(random(10) < 8)
+                g_FakeWorkerMins[c][w] += 1 + random(2);
+            if(g_FakeWorkerMins[c][w] > 800)
+                g_FakeWorkerMins[c][w] = 200 + random(200);
+        }
+    }
+    return 1;
+}
+
+public CrimeResponseExpired()
+{
+    if(g_CrimeCPActive)
+    {
+        DestroyDynamicCP(g_CrimeCP);
+        g_CrimeCP = -1;
+        g_CrimeCPActive = false;
+        SendClientMessageToAll(0xAAAAAFFF,
+            "* [SISTEMA] Pagalbos iskvietimas baige galioti. Niekas nereagavo.");
+    }
+    return 1;
+}
+
+stock SpawnCrimeCheckpoint(Float:x, Float:y, Float:z, reward, type)
+{
+    if(g_CrimeCPActive)
+    {
+        DestroyDynamicCP(g_CrimeCP);
+        KillTimer(g_CrimeCPTimer);
+    }
+    g_CrimeCP       = CreateDynamicCP(x, y, z, 4.0);
+    g_CrimeReward   = reward;
+    g_CrimeCPActive = true;
+    g_CrimeCPType   = type;
+    g_CrimeCPTimer  = SetTimer("CrimeResponseExpired", 300000, false);
+    return g_CrimeCP;
+}
+
+public FakePlayerUpdate()
+{
+    for(new i = 0; i < MAX_FAKE_PLAYERS_DISPLAY; i++)
+    {
+        if(random(12) == 0)
+            g_FakeDisplayOnline[i] = !g_FakeDisplayOnline[i];
+        if(g_FakeDisplayOnline[i])
+            g_FakeDisplayScore[i] += random(4);
+    }
+    return 1;
+}
+
+CMD:zaidejai(playerid, params[])
+{
+    #pragma unused params
+    new msg[3072];
+    new fakeOnline = 0, realOnline = 0;
+    foreach(Player, i) realOnline++;
+    for(new i = 0; i < MAX_FAKE_PLAYERS_DISPLAY; i++)
+        if(g_FakeDisplayOnline[i]) fakeOnline++;
+    new header[64];
+    format(header,sizeof(header),"Zaidejai serveryje: %d", realOnline + fakeOnline);
+    format(msg,sizeof(msg),"{FFFFFF}%-24s %s\n\n","Vardas","XP");
+    foreach(Player, i)
+    {
+        new pname[MAX_PLAYER_NAME];
+        GetPlayerName(i,pname,sizeof(pname));
+        format(msg,sizeof(msg),"%s{00FF00}%-24s {FFFFFF}%d\n", msg, pname, GetPlayerScore(i));
+    }
+    for(new i = 0; i < MAX_FAKE_PLAYERS_DISPLAY; i++)
+    {
+        if(!g_FakeDisplayOnline[i]) continue;
+        format(msg,sizeof(msg),"%s{FFFFFF}%-24s %d\n", msg, g_FakeDisplayName[i], g_FakeDisplayScore[i]);
+    }
+    ShowPlayerDialog(playerid, DIALOG_FAKE_PLAYERS, DIALOG_STYLE_MSGBOX, header, msg, "Gerai","");
+    return 1;
+}
+
+stock SlotReel()
+{
+    new r = random(20);
+    if(r <  1) return 0;
+    if(r <  3) return 1;
+    if(r <  6) return 2;
+    if(r < 10) return 3;
+    if(r < 14) return 4;
+    if(r < 17) return 5;
+    return 6;
+}
+
+stock SlotMultiplier(s1, s2, s3)
+{
+    if(s1==0&&s2==0&&s3==0) return 100;
+    if(s1==1&&s2==1&&s3==1) return  25;
+    if(s1==2&&s2==2&&s3==2) return  15;
+    if(s1==3&&s2==3&&s3==3) return  10;
+    if(s1==s2&&s2==s3)      return   5;
+    if(s1==3&&s2==3)        return   3;
+    if(s1==3)               return   2;
+    return 0;
+}
+
+CMD:kazino(playerid, params[])
+{
+    #pragma unused params
+    ShowPlayerDialog(playerid, DIALOG_KAZINO_MAIN, DIALOG_STYLE_LIST,
+        "Kazino",
+        "Slot Machine\nKauliukai (Dice)",
+        "Zaisti","Iseiti");
+    return 1;
+}
+
 #include "LSG/Callbacks/queries"
 
 #include "LSG/Callbacks/dialogs"

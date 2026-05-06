@@ -4859,40 +4859,58 @@ CMD:bendradarbiai(playerid,params[])
 	#pragma unused params
 	if(playerDB[playerid][specialybe]==0) return SendClientMessage(playerid,COLOR," * Bedarbiai neturi bendradarbiu ;)");
 	new msg[256],x;
-	//new vardas[MAX_PLAYER_NAME],pradirboz;
 	SendClientMessage(playerid,COLOR,"Jusu bendradarbiai:");
 	new lol=-1,lol2=-1,lol3=-1,lol4=-1,lol5=-1,spec = playerDB[playerid][specialybe];
-	
 	if(spec == 2 || spec == 93) { lol=2; lol2=93; }
-	else if(spec == 3 || spec == 20 || spec == 39){ lol = 3; lol2 = 20; lol3 = 39;} // transportas
-	else if(spec == 41 || spec == 44){ lol = 41; lol2 = 44;} // furistai
-	else if(spec == 6 || spec == 28){ lol = 6; lol2 = 28;} // autospeciai
-	else if(spec == 70 || spec == 73 || spec == 72){ lol = 70; lol2 = 73; lol3 = 72;} // autoklubas
+	else if(spec == 3 || spec == 20 || spec == 39){ lol = 3; lol2 = 20; lol3 = 39;}
+	else if(spec == 41 || spec == 44){ lol = 41; lol2 = 44;}
+	else if(spec == 6 || spec == 28){ lol = 6; lol2 = 28;}
+	else if(spec == 70 || spec == 73 || spec == 72){ lol = 70; lol2 = 73; lol3 = 72;}
 	else if(spec == 80 || spec == 81 || spec == 83 || spec == 84 || spec == 82){ lol = 80; lol2 = 81; lol3 = 83; lol4 = 84; lol5=82;}
-	else if(spec == 31 || spec == 32){ lol = 31; lol2=32;} // dealeriai
+	else if(spec == 31 || spec == 32){ lol = 31; lol2=32;}
 	else { lol=spec; }
 	new tickas = GetTickCount();
 	foreach(Player, i)
 	{
-	    if((playerDB[i][specialybe] == lol || playerDB[i][specialybe] == lol2 || playerDB[i][specialybe] == lol3 || playerDB[i][specialybe] == lol4 || playerDB[i][specialybe] == lol5)  && !playerDB[i][invisible])
-	    {
-	        x++;
-	        if(playerDB[i][plead]>0)
-	        	format(msg,256,"%i. Dir. %s pradirbo %imin.",x,ReturnName(i),playerDB[i][pradirbo]);
-	        else
-	       		format(msg,256,"%i. %s pradirbo %imin.",x,ReturnName(i),playerDB[i][pradirbo]);
-	       	if(IsPlayerAfkEx(i,tickas))
-	       	{
-	       		format(msg,256,"%s{FFFFFF} [AFK]",msg);
-	       	}
-
-			if(i == playerid)
-			{
-				//format(msg,100,"%i. %s pradirbo %imin.",x,ReturnName(i),playerDB[i][pradirbo]); // ; %i naud. balai ,playerDB[i][jobpts]
-				SendClientMessage(playerid,RED,msg); 
-			}
+		if((playerDB[i][specialybe] == lol || playerDB[i][specialybe] == lol2 || playerDB[i][specialybe] == lol3 || playerDB[i][specialybe] == lol4 || playerDB[i][specialybe] == lol5) && !playerDB[i][invisible])
+		{
+			x++;
+			if(playerDB[i][plead]>0)
+				format(msg,256,"%i. Dir. %s pradirbo %imin.",x,ReturnName(i),playerDB[i][pradirbo]);
+			else
+				format(msg,256,"%i. %s pradirbo %imin.",x,ReturnName(i),playerDB[i][pradirbo]);
+			if(IsPlayerAfkEx(i,tickas))
+				format(msg,256,"%s [AFK]",msg);
+			if(i == playerid) SendClientMessage(playerid,RED,msg);
 			else SendClientMessage(playerid,COLOR,msg);
-	    }
+		}
+	}
+	// --- Fake workers (solo feature) ---
+	new myPlead = playerDB[playerid][plead];
+	if(myPlead > 0)
+	{
+		new cidx = GetCompanyIdx(myPlead);
+		if(cidx != -1)
+		{
+			new pIdx = myPlead - 1;
+			new firmFund = (pIdx >= 0 && pIdx < 100) ? pelnas[pIdx] : 0;
+			new TotalMins;
+			for(new w = 0; w < MAX_FAKE_WORKERS_PER_CO; w++)
+				if(g_FakeWorkerActive[cidx][w] && g_FakeWorkerMins[cidx][w] >= 100)
+					TotalMins += g_FakeWorkerMins[cidx][w];
+			if(TotalMins < 1) TotalMins = 1;
+			new Float:Kf = float(firmFund) / float(TotalMins);
+			SendClientMessage(playerid,COLOR," --- Virtualus darbuotojai ---");
+			for(new w = 0; w < MAX_FAKE_WORKERS_PER_CO; w++)
+			{
+				if(!g_FakeWorkerActive[cidx][w]) continue;
+				if(g_FakeWorkerMins[cidx][w] < 100) continue;
+				new estAlga = floatround(Kf * g_FakeWorkerMins[cidx][w]);
+				x++;
+				format(msg,256,"%i. %s - %d min. (~%d EUR)",x,g_FakeWorkerName[cidx][w],g_FakeWorkerMins[cidx][w],estAlga);
+				SendClientMessage(playerid,0xAAAAAAAA,msg);
+			}
+		}
 	}
 	return 1;
 }

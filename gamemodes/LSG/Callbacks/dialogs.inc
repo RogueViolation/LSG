@@ -14054,6 +14054,142 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 			}
 		}
 	}
+
+	// ============================================================
+	// SOLO FEATURES — DIALOG HANDLERS
+	// ============================================================
+
+	if(dialogid == DIALOG_MORTGAGE)
+	{
+		if(!response) { DeletePVar(playerid,"MortgageBizID"); return 1; }
+		new bizid = GetPVarInt(playerid,"MortgageBizID");
+		DeletePVar(playerid,"MortgageBizID");
+		if(bizid < 0 || bizid >= MAX_BUSINESSES) return 1;
+		if(BusinessInfo[bizid][bOwned]) return SendInfoMessage(playerid,"Verslas jau parduotas!");
+		new price       = BusinessInfo[bizid][bPrice];
+		new downPayment = price / 5;
+		new mortgage    = price - downPayment;
+		if(GetPlayerMoneyA(playerid) < downPayment)
+			return SendInfoMessage(playerid,"~r~Neuztenka pinigu pradinei imokai!");
+		GivePlayerMoneyA(playerid, -downPayment);
+		BusinessInfo[bizid][bOwned]      = 1;
+		BusinessInfo[bizid][bMokesciai]  = 14;
+		format(BusinessInfo[bizid][bOwner], MAX_PLAYER_NAME, ReturnName(playerid));
+		g_HasMortgage[bizid]       = true;
+		g_MortgageRemaining[bizid] = mortgage;
+		new string[128];
+		format(string,sizeof(string),VERSLAS_NEPARDUODAMAS,
+			BusinessInfo[bizid][bName],BusinessInfo[bizid][bOwner],
+			GetBussinessType(BusinessInfo[bizid][bType]));
+		DestroyDynamic3DTextLabel(businesstext[bizid]);
+		businesstext[bizid] = CreateDynamic3DTextLabel(string,0x00BC00FF,
+			BusinessInfo[bizid][bEnterX],BusinessInfo[bizid][bEnterY],
+			BusinessInfo[bizid][bEnterZ],40.0,_,_,1);
+		new msg[128];
+		format(msg,sizeof(msg)," * Isigiojote versla su paskola! Liko grazinti: %d EUR (automatiskai is pelno).",mortgage);
+		SendClientMessage(playerid,0x00FF00FF,msg);
+		ProcessAchievement(playerid,45);
+		return 1;
+	}
+	if(dialogid == DIALOG_KAZINO_MAIN)
+	{
+		if(!response) return 1;
+		if(listitem == 0)
+			ShowPlayerDialog(playerid, DIALOG_KAZINO_BET, DIALOG_STYLE_LIST,
+				"Slot Machine - Statymas",
+				"100 EUR\n500 EUR\n1,000 EUR\n5,000 EUR\n10,000 EUR",
+				"Losit","Atgal");
+		else
+			ShowPlayerDialog(playerid, DIALOG_DICE_BET, DIALOG_STYLE_LIST,
+				"Kauliukai - Pasirinkite",
+				"100 EUR - Didelis (7-12)\n100 EUR - Mazas (2-6)\n"
+				"500 EUR - Didelis (7-12)\n500 EUR - Mazas (2-6)\n"
+				"1000 EUR - Didelis (7-12)\n1000 EUR - Mazas (2-6)",
+				"Mesti","Atgal");
+		return 1;
+	}
+	if(dialogid == DIALOG_KAZINO_BET)
+	{
+		if(!response) { CMD:kazino(playerid,""); return 1; }
+		static const SlotBets[] = {100,500,1000,5000,10000};
+		new bet = SlotBets[listitem];
+		if(GetPlayerMoneyA(playerid) < bet)
+			return SendInfoMessage(playerid,"~r~Neuztenka pinigu!");
+		new s1=SlotReel(), s2=SlotReel(), s3=SlotReel();
+		new mult = SlotMultiplier(s1,s2,s3);
+		new msg[512];
+		format(msg,sizeof(msg),
+			"%s%s%s  |  %s%s%s  |  %s%s%s\n\n",
+			g_SlotColors[s1],g_SlotSymbols[s1],"{FFFFFF}",
+			g_SlotColors[s2],g_SlotSymbols[s2],"{FFFFFF}",
+			g_SlotColors[s3],g_SlotSymbols[s3],"{FFFFFF}");
+		if(mult > 0)
+		{
+			new winnings = bet * mult;
+			GivePlayerMoneyA(playerid, winnings - bet);
+			if(mult >= 100)
+				format(msg,sizeof(msg),"%s{FFD700}*** DZEKPOTAS! x%d ***\n{FFFFFF}Laimejote: {00FF00}%d EUR",
+					msg,mult,winnings);
+			else
+				format(msg,sizeof(msg),"%s{00FF00}LAIMEJOTE! x%d\n{FFFFFF}Gavote: {00FF00}%d EUR",
+					msg,mult,winnings);
+		}
+		else
+		{
+			GivePlayerMoneyA(playerid,-bet);
+			format(msg,sizeof(msg),"%s{FF0000}Nepasiseke.\n{FFFFFF}Praradote: {FF0000}%d EUR",msg,bet);
+		}
+		ShowPlayerDialog(playerid, DIALOG_KAZINO_RESULT, DIALOG_STYLE_MSGBOX,"Slot Machine",msg,"Dar karta","Baigti");
+		return 1;
+	}
+	if(dialogid == DIALOG_KAZINO_RESULT)
+	{
+		if(response)
+			ShowPlayerDialog(playerid, DIALOG_KAZINO_BET, DIALOG_STYLE_LIST,
+				"Slot Machine - Statymas",
+				"100 EUR\n500 EUR\n1,000 EUR\n5,000 EUR\n10,000 EUR",
+				"Losit","Baigti");
+		return 1;
+	}
+	if(dialogid == DIALOG_DICE_BET)
+	{
+		if(!response) { CMD:kazino(playerid,""); return 1; }
+		static const DiceBets[] = {100,100,500,500,1000,1000};
+		new bet     = DiceBets[listitem];
+		new betHigh = ((listitem % 2) == 0);
+		if(GetPlayerMoneyA(playerid) < bet)
+			return SendInfoMessage(playerid,"~r~Neuztenka pinigu!");
+		new roll1 = 1+random(6), roll2 = 1+random(6), total = roll1+roll2;
+		new won = (betHigh && total >= 7) || (!betHigh && total <= 6);
+		new msg[256];
+		format(msg,sizeof(msg),
+			"Kauliukai: {FFFF00}[%d] + [%d]{FFFFFF} = {FFFF00}%d{FFFFFF}\n\n"
+			"Jus lazinotes: {FFFF00}%s{FFFFFF}\n\n",
+			roll1, roll2, total, betHigh ? "Didelis (7-12)" : "Mazas (2-6)");
+		if(won)
+		{
+			GivePlayerMoneyA(playerid, bet);
+			format(msg,sizeof(msg),"%s{00FF00}LAIMEJOTE! +%d EUR",msg,bet);
+		}
+		else
+		{
+			GivePlayerMoneyA(playerid,-bet);
+			format(msg,sizeof(msg),"%s{FF0000}Pralaimejote. -%d EUR",msg,bet);
+		}
+		ShowPlayerDialog(playerid, DIALOG_DICE_RESULT, DIALOG_STYLE_MSGBOX,"Kauliukai",msg,"Dar karta","Baigti");
+		return 1;
+	}
+	if(dialogid == DIALOG_DICE_RESULT)
+	{
+		if(response)
+			ShowPlayerDialog(playerid, DIALOG_DICE_BET, DIALOG_STYLE_LIST,
+				"Kauliukai - Pasirinkite",
+				"100 EUR - Didelis (7-12)\n100 EUR - Mazas (2-6)\n"
+				"500 EUR - Didelis (7-12)\n500 EUR - Mazas (2-6)\n"
+				"1000 EUR - Didelis (7-12)\n1000 EUR - Mazas (2-6)",
+				"Mesti","Baigti");
+		return 1;
+	}
 	return 1;
 }
 
