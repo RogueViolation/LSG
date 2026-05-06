@@ -39,6 +39,29 @@ CMD:cheal(playerid,params[])
 	RepairVehicle(GetPlayerVehicleID(id));
 	return 1;
 }
+CMD:aminutes(playerid,params[])
+{
+	if(!playerDB[playerid][admin]) return 1;
+	new tname[128],dminutes;
+	if(sscanf(params,"s[24]d",tname,dminutes))
+	{
+		SendInfoMessage(playerid,"Norint pakeisti şaidëjo minutes naudokite /aminutes [vardas] [kiek].");
+		return 1;
+	}
+	if(dminutes < 0) return 0;
+	new tid = GetPlayeridMid(tname);
+	if(tid==INVALID_PLAYER_ID)
+	{
+		SendInfoMessage(playerid,"Zaidejas neprisijunges.");
+		return 1;
+	}
+	GetPlayerName(tid,tname,sizeof(tname));
+	new mess[128],name[MAX_PLAYER_NAME];
+	format(mess,sizeof(mess),"***Nustatëte %s %s minuèiø ",FormatNumber(dminutes),tname);
+	SendClientMessage(playerid,COLOR,mess);
+	playerDB[playerid][pradirbo]=dminutes;
+	return 1;
+}
 CMD:relog(playerid,params[])
 {
     if(!playerDB[playerid][admin]) return 1;
