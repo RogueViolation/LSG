@@ -265,6 +265,10 @@ public OnGameModeInit()
 	SetTimer("JailGates",599984, 1); // 10min
 	SetTimer("GlobalUpdatez",239996, 1); // 4min
 	SetTimer("DegalaiZvejyba",9999,1); // 10 sec
+	SetTimer("BusinessPassiveIncome", 59996, true); // passive income every 60sec
+	SetTimer("WorldEvents", 1000, true);             // driver timer, 1 sec
+	SetTimer("RadioChatter", 1000, true);            // driver timer, 1 sec
+	SetTimer("DailyMarketShift", 3600000, true);     // every in-game hour
 
 	Shamal1 =AddStaticVehicle(469,1781.66369629,-1925.78820801,13.49185181,0.00000000,16,16); //Sparrow
 	Shamal2 =AddStaticVehicle(469,1798.97558594,-1925.74121094,13.49553299,0.00000000,16,16); //Sparrow
