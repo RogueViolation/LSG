@@ -1011,10 +1011,3 @@ stock TestLoterija(playerid)
 		"[testloterija] {FFFFFF}Done. {00FF00}Green{FFFFFF}=player edge  {FF4444}Red{FFFFFF}=house edge");
 }
 	
-	for(new i;i<73;i++)
-	{
-		new Float:proc = (wins[i] * 1.0) / iterations;
-		new Float:EV = iterations - wins[i]*(statymai[i][l_koef]);
-		printf("%i\t%i\t%.2f%s\t%.2f\t%.2f",i,wins[i],proc*100,("%"),statymai[i][l_koef],EV);
-	}
-}

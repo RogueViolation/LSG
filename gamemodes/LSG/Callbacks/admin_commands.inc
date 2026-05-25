@@ -762,7 +762,11 @@ CMD:arsandeliai(playerid,params[])
 			if (IsSandeliai()){
 				GameTextForAll("Sandeliai", 10000, 3 );
 			}
-
+			else {
+				GameTextForAll("Ne Sandeliai", 10000, 3 );
+			}
+			return 1;
+}
 CMD:testloterija(playerid,params[])
 {
 	#pragma unused params
@@ -770,11 +774,6 @@ CMD:testloterija(playerid,params[])
 	SendClientMessage(playerid,0x33CCFFFF,"[testloterija] Running 3000 simulations, please wait...");
 	TestLoterija(playerid);
 	return 1;
-}
-			else {
-				GameTextForAll("Ne Sandeliai", 10000, 3 );
-			}
-			return 1;
 }
 CMD:komplektas(playerid,params[])
 {
