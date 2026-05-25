@@ -451,7 +451,7 @@ stock Nugaletojai()
 		}
 	}
 }
-stock CheckWinner(playerid,statymoid)
+stock CheckWinner(playerid,statymoid,bool:sim=false)
 {
 	new winner = 0;
 	if(statymoid < 11)
@@ -934,11 +934,14 @@ stock CheckWinner(playerid,statymoid)
 
 
 
-	if(winner)
-		IsWinner(playerid,statymoid);
-	else
-		IsLoser(playerid);
-
+	if(!sim)
+	{
+		if(winner)
+			IsWinner(playerid,statymoid);
+		else
+			IsLoser(playerid);
+	}
+	return winner;
 }
 stock IsWinner(playerid,statymoid)
 {
@@ -958,23 +961,55 @@ stock IsLoser(playerid)
 	SendClientMessage(playerid, BLUE, " * Prapisai.");
 	ProcessAchievement(playerid,100);
 }
-stock TestLoterija()
+stock TestLoterija(playerid)
 {
-	printf("Testing loterija!");
-	printf("ID\tWins\tProc\tKofas\tEV");
-	new wins[73];
-	new iterations = 10000;
-	for(new i;i<iterations;i++)
+	// Save live LAR so an ongoing round is not disturbed
+	new savedLAR[7];
+	for(new i;i<7;i++) savedLAR[i] = LAR[i];
+
+	// Pre-set fixed distinct ball picks for number-based bets (IDs 0-10)
+	for(new i;i<7;i++) { new pv[24]; format(pv,24,"numbers_%i",i); SetPVarInt(playerid,pv,i+1); }
+
+	new wins[sizeof statymai];
+	new iterations = 3000;
+	for(new iter;iter<iterations;iter++)
 	{
-		Losimai_Laikas = -1;
-		isridenta = 0;
-		UpdateLosimai();
-		for(new x;x<73;x++)
-		{
-			new result = CheckWinner(0,x);
-			wins[x]+= result;
-		}
+		// Inline shuffle - same logic as UpdateLosimai but without side-effects
+		new Kamuoliukai[42];
+		for(new i;i<42;i++) Kamuoliukai[i] = i+1;
+		for(new z;z<3;z++)
+			for(new i=0;i<42;i++) {
+				new x=random(42), tmp=Kamuoliukai[x];
+				Kamuoliukai[x]=Kamuoliukai[i]; Kamuoliukai[i]=tmp;
+			}
+		new startpos=random(30);
+		for(new i;i<7;i++) LAR[i]=Kamuoliukai[startpos+i];
+
+		for(new x;x<sizeof statymai;x++)
+			wins[x] += CheckWinner(playerid,x,true);
 	}
+
+	// Restore live LAR
+	for(new i;i<7;i++) LAR[i]=savedLAR[i];
+
+	SendClientMessage(playerid,0x33CCFFFF,
+		"[testloterija] {FFFFFF}n=3000 | {AAAAAA}ID  WinRate   Coef    HouseEdge");
+	for(new i;i<sizeof statymai;i++)
+	{
+		new Float:prob = wins[i] * 1.0 / iterations;
+		new Float:ev   = prob * statymai[i][l_koef] - 1.0;
+		new msg[128];
+		format(msg,sizeof(msg),
+			"{AAAAAA}[%02i] {FFFFFF}%5.1f%%  x%-5.2f  {%s}%+.1f%%",
+			i, prob*100.0, statymai[i][l_koef],
+			(ev>=0.0)?("00FF00"):("FF4444"), ev*100.0);
+		SendClientMessage(playerid,-1,msg);
+		printf("[testloterija] %02i  %.2f%%  x%.2f  %+.2f%%",
+			i,prob*100.0,statymai[i][l_koef],ev*100.0);
+	}
+	SendClientMessage(playerid,0x33CCFFFF,
+		"[testloterija] {FFFFFF}Done. {00FF00}Green{FFFFFF}=player edge  {FF4444}Red{FFFFFF}=house edge");
+}
 	
 	for(new i;i<73;i++)
 	{

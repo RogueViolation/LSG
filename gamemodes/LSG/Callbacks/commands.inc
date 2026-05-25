@@ -7953,7 +7953,7 @@ CMD:paimtipelna(playerid,params[])
 	new i = GetPlayerVirtualWorld(playerid) - MAX_HOUSES*2;
 	if(strcmp(BusinessInfo[i][bOwner],ReturnName(playerid),false) || !BusinessInfo[i][bOwned]) return SendInfoMessage(playerid,"Tai ne jusu verslas!");
 	new kiek;
-	new lets = 1000-BusinessInfo[i][bPaeme];
+	new lets = 10000000-BusinessInfo[i][bPaeme];
 	if(sscanf(params,"i",kiek))
 	{
 		new msg[128];
@@ -7963,7 +7963,7 @@ CMD:paimtipelna(playerid,params[])
 			kiek = lets;
 		if(kiek < 0)
 			return SendInfoMessage(playerid,"~r~Negali paimti firmos pelno!");
-		format(msg,sizeof(msg)," * Is savo firmos paemete %i€. Per diena galite paimti iki 1000€.",kiek);
+		format(msg,sizeof(msg)," * Is savo firmos paemete %i€. Per diena galite paimti iki 10000000€.",kiek);
 		SendClientMessage(playerid,YELLOW,msg);
 		SendClientMessage(playerid, COLOR, " * Rekomenduojame naudotis inkasatoriu paslaugomis. Uzsakyma galite padaryti ju ofise (/darbai)");
 		GivePlayerMoneyA(playerid,kiek);
@@ -7972,14 +7972,14 @@ CMD:paimtipelna(playerid,params[])
 	}
 	else if(kiek <= 0) return SendInfoMessage(playerid,"~r~Netinkama suma!");
 	else if(kiek >= BusinessInfo[i][bEarning]) return SendInfoMessage(playerid,"~r~Jusu pelne tiek nera! Rasykite /verslai");
-	else if(kiek+BusinessInfo[i][bPaeme] > 1000)
+	else if(kiek+BusinessInfo[i][bPaeme] > 10000000)
 	{
-		new dif = 1000-BusinessInfo[i][bPaeme];
+		new dif = 10000000-BusinessInfo[i][bPaeme];
 		new msg[128];
-		format(msg,sizeof(msg)," * Per diena galite paimti tik iki 1000€. Siandien galite paimti %i€.",dif);
+		format(msg,sizeof(msg)," * Per diena galite paimti tik iki 10000000€. Siandien galite paimti %i€.",dif);
 		SendClientMessage(playerid, COLOR, msg);
 		SendClientMessage(playerid, COLOR, " * Rekomenduojame naudotis inkasatoriu paslaugomis. Uzsakyma galite padaryti ju ofise (/darbai)");
-		return SendInfoMessage(playerid,"~r~Per diena galite paimti iki 1000EUR");
+		return SendInfoMessage(playerid,"~r~Per diena galite paimti iki 10000000EUR");
 	}
 	else
 	{

@@ -3399,7 +3399,7 @@ public OnPlayerConnect(playerid)
 	SendClientMessage(playerid,BLUE," ");
 	SendClientMessage(playerid,BLUE," ");
 	SendInfoMessage(playerid,"~y~Los~n~~g~Santos~r~~n~Gyvenimas");
-	SendClientMessage(playerid,0x3FC079FF,"Sveiki atvykæ! Praðome{33FF00} prisijungti{3FC079} arba{99FF33} uþsiregistruoti.");
+	SendClientMessage(playerid,0x3FC079FF,"Sveiki atvykæ! Praðome{33FF00} prisijungti{3FC079} arba{99FF33} uþsiregistruoti. Sekmës!");
 	SendClientMessage(playerid,0x3FC079FF,"Visas taisykles, atnaujinimus bei kità informacijà rasite mûsø tinklapyje {FF0000}www.lsgyvenimas.lt ");
 	SendClientMessage(playerid,0x3FC079FF,"Prisijungdami á serverá, jûs sutinkate su visomis serverio taisyklëmis.");
 	SendClientMessage(playerid,0x3FC079FF,"Jei nematote lietuvisku raidziu, jas galite isjungti VVP nustatymuose ( /p )");
@@ -26132,10 +26132,10 @@ public Uzemimas(playerid,pickupi)
 	}
 	new str[128];
 	format(str,sizeof(str),"%s_sandelis~n~~n~~n~~n~",vietele);
-	new bool:WedSat = KuriVieta < 4 && (WeekDay == 0 || WeekDay == 4);
-	new bool:ThuSun = KuriVieta >= 4 && (WeekDay == 1 || WeekDay == 5);
+	new bool:WedSat = KuriVieta < 4 && (WeekDay == 2 || WeekDay == 6);
+	new bool:ThuSun = KuriVieta >= 4 && (WeekDay == 3 || WeekDay == 0);
 
-	if( ( WedSat || ThuSun ) && (hour == 18 && minute > 30))
+	if( ( WedSat || ThuSun ) && (hour == 14 && minute > 0))
 	{
 		PlayerTextDrawSetString(playerid,VeiksmuTD[playerid],str);
 		PlayerTextDrawShow(playerid,VeiksmuTD[playerid]);
@@ -26441,12 +26441,12 @@ stock NarkoVietos(playerid,pickupid)
 		else if(KuriVieta == 4)
 			PickupKiausas(playerid, 4);
 	}*/
-	new bool:WedSat = KuriVieta < 4 && (WeekDay == 0 || WeekDay == 4);
-	new bool:ThuSun = KuriVieta >= 4 && (WeekDay == 1 || WeekDay == 5);
+	new bool:WedSat = KuriVieta < 4 && (WeekDay == 2 || WeekDay == 6);
+	new bool:ThuSun = KuriVieta >= 4 && (WeekDay == 3 || WeekDay == 0);
 
 	if(  WedSat || ThuSun  )
 	{
-		if(hour == 18 && minute > 30)
+		if(hour == 14 && minute > 0)
 		{
 			if ( WedSat )
 			    BombaYra[3]=1;
@@ -36872,8 +36872,8 @@ stock OnTimeChange(hour,minute)
 		LogMetricFloat("packet_loss",GetServerPacketLoss());
 	}
 	new WeekDay = GetWeekDay();
-	new bool:WedSat = (WeekDay == 0 || WeekDay == 4);
-	if(WedSat && hour == 19 && minute <= 1) // run twice in case somehow missed
+	new bool:WedSat = (WeekDay == 2 || WeekDay == 6);
+	if(WedSat && hour == 15 && minute <= 1) // run twice in case somehow missed
 	{
 		CheckDrugKingAchievement();
 	}

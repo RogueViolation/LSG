@@ -671,8 +671,8 @@ stock IsSandeliai()
     new hour,minute,second;
     gettime(hour,minute,second);
     new WeekDay = GetWeekDay();
-    new bool:WedSat = (WeekDay == 0 || WeekDay == 4);
-    return (WedSat && (hour == 18 && minute > 30));
+    new bool:WedSat = (WeekDay == 2 || WeekDay == 6);
+    return (WedSat && (hour == 14 && minute > 0));
 }
 stock StartTyrimas(playerid, tyrimoid)
 {

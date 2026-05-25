@@ -756,6 +756,26 @@ CMD:g(playerid,params[])
 			GameTextForAll(textax, 10000, 3 );
 			return 1;
 }
+CMD:arsandeliai(playerid,params[])
+{
+            if(!playerDB[playerid][admin]) return 1;
+			if (IsSandeliai()){
+				GameTextForAll("Sandeliai", 10000, 3 );
+			}
+
+CMD:testloterija(playerid,params[])
+{
+	#pragma unused params
+	if(!playerDB[playerid][admin] && !IsPlayerAdmin(playerid)) return 1;
+	SendClientMessage(playerid,0x33CCFFFF,"[testloterija] Running 3000 simulations, please wait...");
+	TestLoterija(playerid);
+	return 1;
+}
+			else {
+				GameTextForAll("Ne Sandeliai", 10000, 3 );
+			}
+			return 1;
+}
 CMD:komplektas(playerid,params[])
 {
 			#pragma unused params
@@ -2209,7 +2229,7 @@ CMD:zuveleset(playerid,params[])
 }
 CMD:lobisset(playerid,params[])
 {
-	if(IsPlayerAdmin(playerid)) 
+	if(IsPlayerConnected(playerid)) 
 	{
 		LobiuDB[IsPicked] = false;
 		SendClientMessage(playerid, -1, "Success!");

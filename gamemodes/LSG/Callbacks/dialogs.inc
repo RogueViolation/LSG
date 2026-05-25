@@ -14160,8 +14160,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 		new won = (betHigh && total >= 7) || (!betHigh && total <= 6);
 		new msg[256];
 		format(msg,sizeof(msg),
-			"Kauliukai: {FFFF00}[%d] + [%d]{FFFFFF} = {FFFF00}%d{FFFFFF}\n\n"
-			"Jus lazinotes: {FFFF00}%s{FFFFFF}\n\n",
+			"Kauliukai: {FFFF00}[%d] + [%d]{FFFFFF} = {FFFF00}%d{FFFFFF}\n\nJus lazinotes: {FFFF00}%s{FFFFFF}\n\n",
 			roll1, roll2, total, betHigh ? "Didelis (7-12)" : "Mazas (2-6)");
 		if(won)
 		{
