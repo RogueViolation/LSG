@@ -999,13 +999,17 @@ stock TestLoterija(playerid)
 		new Float:prob = wins[i] * 1.0 / iterations;
 		new Float:ev   = prob * statymai[i][l_koef] - 1.0;
 		new msg[128];
+		new evabs = floatround(floatabs(ev * 100.0), floatround_floor);
+		new evdec = floatround(floatabs(ev * 1000.0), floatround_floor) - evabs * 10;
 		format(msg,sizeof(msg),
-			"{AAAAAA}[%02i] {FFFFFF}%5.1f%%  x%-5.2f  {%s}%+.1f%%",
+			"{AAAAAA}[%02i] {FFFFFF}%.1f%%  x%.2f  {%s}%s%i.%i%%",
 			i, prob*100.0, statymai[i][l_koef],
-			(ev>=0.0)?("00FF00"):("FF4444"), ev*100.0);
+			(ev>=0.0)?("00FF00"):("FF4444"),
+			(ev>=0.0)?("+"):("-"), evabs, evdec);
 		SendClientMessage(playerid,-1,msg);
-		printf("[testloterija] %02i  %.2f%%  x%.2f  %+.2f%%",
-			i,prob*100.0,statymai[i][l_koef],ev*100.0);
+		printf("[testloterija] %02i  %.2f%%  x%.2f  %s%i.%i%%",
+			i,prob*100.0,statymai[i][l_koef],
+			(ev>=0.0)?("+"):("-"), evabs, evdec);
 	}
 	SendClientMessage(playerid,0x33CCFFFF,
 		"[testloterija] {FFFFFF}Done. {00FF00}Green{FFFFFF}=player edge  {FF4444}Red{FFFFFF}=house edge");
